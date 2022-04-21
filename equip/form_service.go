@@ -62,6 +62,7 @@ func ListBorrow(c echo.Context) error {
 
 func PutReturn(c echo.Context) error {
 	returnForm := new(mysql.ReturnForm)
+	resData := map[string]interface{}{}
 
 	sessionId := c.QueryParam("sessionId")
 	user, err := UserAPI.GetUserBySession(sessionId, c)
@@ -98,10 +99,19 @@ func PutReturn(c echo.Context) error {
 		continue
 	}
 	if len(borrow.EquipList) != 0 {
-		return c.JSON(200, ResponseMessage{Code: 400, Message: "归还体育用品缺少", Data: borrow.EquipList, Success: false})
+		var priceSum float32
+		for _, equip := range borrow.EquipList {
+			price, _ := mysql.GetEquipPriceById(equip.EquipId)
+			priceSum += price * float32(equip.Count)
+		}
+		resData["equips"] = borrow.EquipList
+		resData["priceSum"] = priceSum
+		return c.JSON(200, ResponseMessage{Code: 400, Message: "归还体育用品缺少", Data: resData, Success: false})
 	}
 	if createTime > borrow.ExpiryTime {
-		return c.JSON(200, ResponseMessage{Code: 400, Message: "逾期,需要缴费", Data: borrow.EquipList, Success: false})
+		priceSum := (createTime-borrow.ExpiryTime)/int64(time.Hour.Seconds()*24) + 1
+		resData["priceSum"] = priceSum
+		return c.JSON(200, ResponseMessage{Code: 400, Message: "逾期,需要缴费", Data: resData, Success: false})
 	}
 	err = mysql.PutReturn(user.Id, returnForm.BorrowId, createTime, returnForm.EquipList)
 	if err != nil {

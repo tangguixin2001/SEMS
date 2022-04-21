@@ -1,5 +1,7 @@
 package mysql
 
+import "errors"
+
 type Equipment struct {
 	Id    int     `json:"id"`
 	Name  string  `json:"name"`
@@ -74,23 +76,62 @@ func DeleteEquip(id int) error {
 	return nil
 }
 
-func ListEquip(current int, size int, class string) (data int, total int, equips []Equipment, err error) {
+func ListEquip(marker string, current int, size int) (data int, total int, equips []Equipment, err error) {
 	db := NewConn()
 	defer db.Close()
 
-	rows, err := db.Query("SELECT \nCOUNT(1)\nFROM equip")
-	if err != nil {
-		return 0, 0, nil, err
-	}
-	defer rows.Close()
-	if rows.Next() {
-		rows.Scan(&total)
-	}
+	if marker == "" {
+		rows, err := db.Query("SELECT \nCOUNT(1)\nFROM equip")
+		if err != nil {
+			return 0, 0, nil, err
+		}
+		defer rows.Close()
+		if rows.Next() {
+			rows.Scan(&total)
+		}
 
-	if class != "" {
-		return
+		rows, err = db.Query("SELECT \ne.id,\ne.name,\ne.price,\ne.class,\ne.sum,\ne.rep,\ne.img\nFROM equip e\nLIMIT ?,?;", size*(current-1), size)
+		if err != nil {
+			return 0, 0, nil, err
+		}
+		defer rows.Close()
+
+		i := 0
+		for ; rows.Next(); i++ {
+			var (
+				equip Equipment
+				id    int
+				name  string
+				price float64
+				class string
+				sum   int
+				rep   int
+				img   string
+			)
+			rows.Scan(&id, &name, &price, &class, &sum, &rep, &img)
+			equip.Id = id
+			equip.Name = name
+			equip.Class = class
+			equip.Price = price
+			equip.Img = img
+			equip.Rep = rep
+			equip.Sum = sum
+			equips = append(equips, equip)
+		}
+		data = len(equips)
+		return data, total, equips, nil
 	} else {
-		rows, err := db.Query("SELECT \ne.id,\ne.name,\ne.price,\ne.class,\ne.sum,\ne.rep,\ne.img\nFROM equip e\nLIMIT ?,?;", size*(current-1), size)
+		markerLike := "%" + marker + "%"
+		rows, err := db.Query("SELECT \nCOUNT(1)\nFROM equip AS e\nWHERE\ne.id=?\nOR\ne.name LIKE ?\nOR\ne.class LIKE ?;", marker, markerLike, markerLike)
+		if err != nil {
+			return 0, 0, nil, err
+		}
+		defer rows.Close()
+		if rows.Next() {
+			rows.Scan(&total)
+		}
+
+		rows, err = db.Query("SELECT \ne.id,\ne.name,\ne.price,\ne.class,\ne.sum,\ne.rep,\ne.img\nFROM equip e\nWHERE\ne.id=?\nOR\ne.name LIKE ?\nOR\ne.class LIKE ?\nLIMIT ?,?;", marker, markerLike, markerLike, size*(current-1), size)
 		if err != nil {
 			return 0, 0, nil, err
 		}
@@ -121,4 +162,25 @@ func ListEquip(current int, size int, class string) (data int, total int, equips
 		data = len(equips)
 		return data, total, equips, nil
 	}
+}
+
+func GetEquipPriceById(id int) (price float32, err error) {
+	db := NewConn()
+	defer db.Close()
+
+	rows, err := db.Query("SELECT\ne.price\nfrom equip e\nWHERE e.id=?;", id)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		err := rows.Scan(&price)
+		if err != nil {
+			return 0, err
+		}
+	} else {
+		return 0, errors.New("查询不到该体育用品")
+	}
+	return price, nil
 }

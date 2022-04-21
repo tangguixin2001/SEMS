@@ -344,11 +344,13 @@ func ListUser(c echo.Context) error {
 
 	current, _ := strconv.Atoi(c.FormValue("current"))
 	size, _ := strconv.Atoi(c.FormValue("size"))
+	marker := c.FormValue("marker")
 
-	data, total, users, err := mysql.ListUser(current, size)
+	data, total, users, err := mysql.ListUser(marker, current, size)
 	if err != nil {
 		return c.JSON(200, ResponseMessage{Code: http.StatusBadRequest, Message: err.Error(), Success: false})
 	}
+	resData["marker"] = marker
 	resData["users"] = users
 	resData["data"] = data
 	resData["total"] = total

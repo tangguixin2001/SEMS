@@ -119,11 +119,13 @@ func ListEquip(c echo.Context) error {
 	resData := map[string]interface{}{}
 	current, _ := strconv.Atoi(c.FormValue("current"))
 	size, _ := strconv.Atoi(c.FormValue("size"))
+	marker := c.FormValue("marker")
 
-	data, total, equips, err := mysql.ListEquip(current, size, "")
+	data, total, equips, err := mysql.ListEquip(marker, current, size)
 	if err != nil {
 		return c.JSON(200, ResponseMessage{Code: http.StatusBadRequest, Message: err.Error(), Success: false})
 	}
+	resData["marker"] = marker
 	resData["equips"] = equips
 	resData["data"] = data
 	resData["total"] = total

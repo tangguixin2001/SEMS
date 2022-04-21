@@ -339,41 +339,77 @@ func SetUserLastLogin(name string, lastLogin int) error {
 	return nil
 }
 
-func ListUser(current int, size int) (data int, total int, users []User, err error) {
+func ListUser(marker string, current int, size int) (data int, total int, users []User, err error) {
 	db := NewConn()
 	defer db.Close()
 
-	rows, err := db.Query("SELECT \nCOUNT(1)\nFROM user")
-	if err != nil {
-		return 0, 0, nil, err
-	}
-	defer rows.Close()
-	if rows.Next() {
-		rows.Scan(&total)
+	if marker == "" {
+		rows, err := db.Query("SELECT \nCOUNT(1)\nFROM user")
+		if err != nil {
+			return 0, 0, nil, err
+		}
+		defer rows.Close()
+		if rows.Next() {
+			rows.Scan(&total)
+		}
+
+		rows, err = db.Query("SELECT \nu.id,\nu.NAME,\ni.ident\nFROM user u\nJOIN ident i ON i.id=u.ident_id\nLIMIT ?,?;", size*(current-1), size)
+		if err != nil {
+			return 0, 0, nil, err
+		}
+		defer rows.Close()
+
+		i := 0
+		for ; rows.Next(); i++ {
+			var (
+				user  User
+				id    int
+				name  string
+				ident string
+			)
+			rows.Scan(&id, &name, &ident)
+			user.Id = id
+			user.Name = name
+			user.Ident = ident
+			users = append(users, user)
+		}
+		data = len(users)
+		return data, total, users, nil
+	} else {
+		markerLike := "%" + marker + "%"
+		rows, err := db.Query("SELECT \nCOUNT(1)\nFROM user AS u\nWHERE\nu.id=?\nOR\nu.name LIKE ?\nOR\nu.realname LIKE ?\nOR\nu.phone LIKE ?\nOR\nu.email LIKE ?\nOR\nu.school LIKE ?\nOR\nu.grade LIKE ?\nOR\nu.class LIKE ?\nOR\nu.officialid LIKE ?;", marker, markerLike, markerLike, markerLike, markerLike, markerLike, markerLike, markerLike, markerLike)
+		if err != nil {
+			return 0, 0, nil, err
+		}
+		defer rows.Close()
+		if rows.Next() {
+			rows.Scan(&total)
+		}
+
+		rows, err = db.Query("SELECT \nu.id,\nu.NAME,\ni.ident\nFROM user u\nJOIN ident i ON i.id=u.ident_id\nWHERE\nu.id=?\nOR\nu.name LIKE ?\nOR\nu.realname LIKE ?\nOR\nu.phone LIKE ?\nOR\nu.email LIKE ?\nOR\nu.school LIKE ?\nOR\nu.grade LIKE ?\nOR\nu.class LIKE ?\nOR\nu.officialid LIKE ?\nLIMIT ?,?;", marker, markerLike, markerLike, markerLike, markerLike, markerLike, markerLike, markerLike, markerLike, size*(current-1), size)
+		if err != nil {
+			return 0, 0, nil, err
+		}
+		defer rows.Close()
+
+		i := 0
+		for ; rows.Next(); i++ {
+			var (
+				user  User
+				id    int
+				name  string
+				ident string
+			)
+			rows.Scan(&id, &name, &ident)
+			user.Id = id
+			user.Name = name
+			user.Ident = ident
+			users = append(users, user)
+		}
+		data = len(users)
+		return data, total, users, nil
 	}
 
-	rows, err = db.Query("SELECT \nu.id,\nu.NAME,\ni.ident\nFROM user u\nJOIN ident i ON i.id=u.ident_id\nLIMIT ?,?;", size*(current-1), size)
-	if err != nil {
-		return 0, 0, nil, err
-	}
-	defer rows.Close()
-
-	i := 0
-	for ; rows.Next(); i++ {
-		var (
-			user  User
-			id    int
-			name  string
-			ident string
-		)
-		rows.Scan(&id, &name, &ident)
-		user.Id = id
-		user.Name = name
-		user.Ident = ident
-		users = append(users, user)
-	}
-	data = len(users)
-	return data, total, users, nil
 }
 
 //禁用用户
