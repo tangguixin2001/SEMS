@@ -33,12 +33,12 @@ func CreateBorrow(userId int, equipList []KV, createTime int64, expiryTime int64
 		rows.Scan(&borrowId)
 	}
 
-	for equipId, count := range equipList {
+	for _, equip := range equipList {
 		stmt, err = tx.Prepare("INSERT INTO\nborrow_equips(borrow_id,equip_id,COUNT)\nVALUES(?,?,?);")
 		if err != nil {
 			return err
 		}
-		_, err = stmt.Exec(borrowId, equipId, count)
+		_, err = stmt.Exec(borrowId, equip.EquipId, equip.Count)
 		if err != nil {
 			return err
 		}
@@ -46,7 +46,7 @@ func CreateBorrow(userId int, equipList []KV, createTime int64, expiryTime int64
 		if err != nil {
 			return err
 		}
-		_, err = stmt.Exec(count, equipId)
+		_, err = stmt.Exec(equip.Count, equip.EquipId)
 		if err != nil {
 			return err
 		}
@@ -242,12 +242,12 @@ func PutReturn(userId int, borrowId int, createTime int64, equipList []KV) error
 		return err
 	}
 
-	for equipId, count := range equipList {
+	for _, equip := range equipList {
 		stmt, err = tx.Prepare("UPDATE equip AS e \nSET \ne.rep=e.rep+?\nWHERE\ne.id=?;")
 		if err != nil {
 			return err
 		}
-		_, err = stmt.Exec(count, equipId)
+		_, err = stmt.Exec(equip.Count, equip.EquipId)
 		if err != nil {
 			return err
 		}

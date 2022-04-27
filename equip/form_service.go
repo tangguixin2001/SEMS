@@ -12,7 +12,7 @@ import (
 func CreateBorrow(c echo.Context) error {
 	borrow := new(mysql.BorrowForm)
 
-	sessionId := c.QueryParam("sessionId")
+	sessionId := c.Request().Header.Get("sessionId")
 	user, err := UserAPI.GetUserBySession(sessionId, c)
 	if err != nil {
 		return c.JSON(200, ResponseMessage{Code: http.StatusBadRequest, Message: err.Error(), Success: false})
@@ -41,7 +41,7 @@ func ListBorrow(c echo.Context) error {
 
 	resData := map[string]interface{}{}
 
-	sessionId := c.QueryParam("sessionId")
+	sessionId := c.FormValue("sessionId")
 	user, err := UserAPI.GetUserBySession(sessionId, c)
 	if err != nil {
 		return c.JSON(200, ResponseMessage{Code: http.StatusBadRequest, Message: err.Error(), Success: false})
@@ -64,7 +64,7 @@ func PutReturn(c echo.Context) error {
 	returnForm := new(mysql.ReturnForm)
 	resData := map[string]interface{}{}
 
-	sessionId := c.QueryParam("sessionId")
+	sessionId := c.Request().Header.Get("sessionId")
 	user, err := UserAPI.GetUserBySession(sessionId, c)
 	if err != nil {
 		return c.JSON(200, ResponseMessage{Code: http.StatusBadRequest, Message: err.Error(), Success: false})
