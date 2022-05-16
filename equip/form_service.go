@@ -29,6 +29,15 @@ func CreateBorrow(c echo.Context) error {
 	createTime := time.Now().Unix()
 	expiryTime := createTime + (borrow.Hours * time.Hour.Milliseconds() / 1000)
 
+	for _, equip := range borrow.EquipList {
+		_, _, equips, _ := mysql.ListEquip(string(equip.EquipId), 1, 1)
+		if len(equips) > 0 {
+			if equip.Count > equips[0].Rep {
+				return c.JSON(200, ResponseMessage{Code: 400, Message: "借用体育用品数量超出库存", Success: false})
+			}
+		}
+	}
+
 	err = mysql.CreateBorrow(user.Id, borrow.EquipList, createTime, expiryTime)
 	if err != nil {
 		return c.JSON(200, ResponseMessage{Code: 400, Message: err.Error(), Success: false})
@@ -52,6 +61,47 @@ func ListBorrow(c echo.Context) error {
 	data, total, borrows, err := mysql.ListBorrows(user.Id, current, size)
 	if err != nil {
 		return c.JSON(200, ResponseMessage{Code: 400, Message: err.Error(), Success: false})
+	}
+
+	for i, borrow := range borrows {
+		for j, equip := range borrow.EquipList {
+			_, _, equips, _ := mysql.ListEquip(strconv.Itoa(equip.EquipId), 1, 1)
+			if equips != nil {
+				borrows[i].EquipList[j].EquipName = equips[0].Name
+			}
+		}
+	}
+
+	resData["borrows"] = borrows
+	resData["data"] = data
+	resData["total"] = total
+	return c.JSON(200, ResponseMessage{Code: 200, Data: resData, Success: true})
+}
+
+func ListBorrowsWhereStatus0(c echo.Context) error {
+
+	resData := map[string]interface{}{}
+
+	sessionId := c.FormValue("sessionId")
+	user, err := UserAPI.GetUserBySession(sessionId, c)
+	if err != nil {
+		return c.JSON(200, ResponseMessage{Code: http.StatusBadRequest, Message: err.Error(), Success: false})
+	}
+	current, _ := strconv.Atoi(c.FormValue("current"))
+	size, _ := strconv.Atoi(c.FormValue("size"))
+
+	data, total, borrows, err := mysql.ListBorrowsWhereStatus0(user.Id, current, size)
+	if err != nil {
+		return c.JSON(200, ResponseMessage{Code: 400, Message: err.Error(), Success: false})
+	}
+
+	for i, borrow := range borrows {
+		for j, equip := range borrow.EquipList {
+			_, _, equips, _ := mysql.ListEquip(strconv.Itoa(equip.EquipId), 1, 1)
+			if equips != nil {
+				borrows[i].EquipList[j].EquipName = equips[0].Name
+			}
+		}
 	}
 
 	resData["borrows"] = borrows
@@ -84,8 +134,8 @@ func PutReturn(c echo.Context) error {
 	}
 	for i := 0; i < len(returnForm.EquipList); i++ {
 		equip := returnForm.EquipList[i]
-		for j := 0; j < len(borrow.EquipList); i++ {
-			borrowEquip := borrow.EquipList[i]
+		for j := 0; j < len(borrow.EquipList); j++ {
+			borrowEquip := borrow.EquipList[j]
 			if borrowEquip.EquipId == equip.EquipId {
 				if borrowEquip.Count == equip.Count {
 					borrow.EquipList = append(borrow.EquipList[:j], borrow.EquipList[j+1:]...)

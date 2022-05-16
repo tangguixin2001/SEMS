@@ -1,8 +1,10 @@
 package mysql
 
-import "errors"
+import (
+	"errors"
+)
 
-func CreateBorrow(userId int, equipList []KV, createTime int64, expiryTime int64) error {
+func CreateBorrow(userId int, equipList []Equip, createTime int64, expiryTime int64) error {
 	var (
 		borrowId int
 	)
@@ -95,7 +97,7 @@ func ListBorrows(userId int, current int, size int) (data int, total int, borrow
 		var (
 			borrow     BorrowForm
 			id         int
-			equipList  []KV
+			equipList  []Equip
 			createTime int64
 			expiryTime int64
 			status     int
@@ -114,7 +116,89 @@ func ListBorrows(userId int, current int, size int) (data int, total int, borrow
 		for i := 0; rowssec.Next(); i++ {
 
 			var (
-				equip   KV
+				equip   Equip
+				equipId int
+				count   int
+			)
+
+			err = rowssec.Scan(&equipId, &count)
+			if err != nil {
+				return data, total, nil, err
+			}
+			equip.EquipId = equipId
+			equip.Count = count
+			equipList = append(equipList, equip)
+		}
+
+		borrow.Id = id
+		borrow.CreateTime = createTime
+		borrow.ExpiryTime = expiryTime
+		borrow.Status = status
+		borrow.EquipList = equipList
+		borrow.UserId = userId
+		borrows = append(borrows, borrow)
+	}
+
+	data = len(borrows)
+	return data, total, borrows, nil
+}
+
+func ListBorrowsWhereStatus0(userId int, current int, size int) (data int, total int, borrows []BorrowForm, err error) {
+	db := NewConn()
+	defer db.Close()
+
+	rowfirst, err := db.Query("SELECT \nCOUNT(1)\nFROM borrow AS b\nWHERE b.user_id=?\nAND b.`status`=0;", userId)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	defer rowfirst.Close()
+	if rowfirst.Next() {
+		rowfirst.Scan(&total)
+	}
+
+	dbsec := NewConn()
+	stmtsec, err := dbsec.Prepare("SELECT\nbe.equip_id,\nbe.count\nFROM borrow_equips AS be\nWHERE be.borrow_id=?;")
+	if err != nil {
+		return data, total, nil, err
+	}
+	defer stmtsec.Close()
+
+	stmt, err := db.Prepare("SELECT\nb.id,\nb.create_time,\nb.expiry_time,\nb.status\nFROM borrow AS b\nWHERE b.user_id=?\nAND b.`status`=0\nLIMIT ?,?;")
+	if err != nil {
+		return data, total, nil, err
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(userId, size*(current-1), size)
+	if err != nil {
+		return data, total, nil, err
+	}
+	defer rows.Close()
+
+	for i := 0; rows.Next(); i++ {
+		var (
+			borrow     BorrowForm
+			id         int
+			equipList  []Equip
+			createTime int64
+			expiryTime int64
+			status     int
+		)
+
+		err = rows.Scan(&id, &createTime, &expiryTime, &status)
+		if err != nil {
+			return data, total, nil, err
+		}
+
+		rowssec, err := stmtsec.Query(id)
+		if err != nil {
+			return data, total, nil, err
+		}
+
+		for i := 0; rowssec.Next(); i++ {
+
+			var (
+				equip   Equip
 				equipId int
 				count   int
 			)
@@ -167,7 +251,7 @@ func GetBorrow(borrowId int) (borrow BorrowForm, err error) {
 	if rows.Next() {
 		var (
 			user_id    int
-			equipList  []KV
+			equipList  []Equip
 			createTime int64
 			expiryTime int64
 			status     int
@@ -186,7 +270,7 @@ func GetBorrow(borrowId int) (borrow BorrowForm, err error) {
 		for i := 0; rowssec.Next(); i++ {
 
 			var (
-				equip   KV
+				equip   Equip
 				equipId int
 				count   int
 			)
@@ -213,7 +297,7 @@ func GetBorrow(borrowId int) (borrow BorrowForm, err error) {
 	return borrow, nil
 }
 
-func PutReturn(userId int, borrowId int, createTime int64, equipList []KV) error {
+func PutReturn(userId int, borrowId int, createTime int64, equipList []Equip) error {
 	db := NewConn()
 	defer db.Close()
 

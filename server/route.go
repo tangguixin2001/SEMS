@@ -48,7 +48,9 @@ func Main() {
 	e.POST("/equip/list", equip.ListEquip)
 	e.POST("/borrow/put", equip.CreateBorrow)
 	e.POST("/borrow/list", equip.ListBorrow)
+	e.POST("/borrow/list/status", equip.ListBorrowsWhereStatus0)
 	e.POST("/return/put", equip.PutReturn)
+	e.POST("/monitor/get", user.GetMonitorInfo)
 	// Start server
 	e.Logger.Fatal(e.Start(port))
 }

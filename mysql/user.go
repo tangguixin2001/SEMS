@@ -6,9 +6,10 @@ import (
 )
 
 type User struct {
-	Id    int    `json:"id"`
-	Name  string `json:"name"`
-	Ident string `json:"ident"`
+	Id      int          `json:"id"`
+	Name    string       `json:"name"`
+	Ident   string       `json:"ident"`
+	Borrows []BorrowForm `json:"borrows"`
 }
 
 const (
